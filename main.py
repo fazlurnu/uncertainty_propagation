@@ -13,6 +13,8 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.mixture import GaussianMixture
 
+from time import gmtime, strftime
+
 # Replace these with your actual import statements if different
 from autonomous_separation import (
     cre_conflict,
@@ -584,10 +586,11 @@ class ConflictResolutionSimulation:
         # ------------------------------------------------------------
         if self.results:
             results_df = pd.DataFrame(self.results)
+            datetime = strftime("%Y-%m-%d %H:%M:%S", gmtime())
             # You could also rename this file to include the case & source if you want
             results_csv_path = os.path.join(
                 self.clustering.OUTPUT_DIR, 
-                "dataframe_results.csv"
+                f"dataframe_results_{datetime}.csv"
             )
             results_df.to_csv(results_csv_path, index=False)
             print(f"\nDataframe logging saved to: {results_csv_path}")
