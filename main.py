@@ -278,15 +278,15 @@ class ConflictResolutionSimulation:
         self.gs_own = 20
 
         # Loop parameters
+        self.gs_int = 15 ## this is the speed of the intruder
+        self.tlosh = 15
+        self.rpz = 50
         self.dcpa_start = 0
         self.dcpa_end = 49
         self.dcpa_delta = 5  # With start=0, end=4, delta=5 => only dcpa=0
         self.dpsi_start = 0
-        self.dpsi_end = 46
-        self.dpsi_delta = 2
-        self.spd = 15
-        self.tlosh = 15
-        self.rpz = 50
+        self.dpsi_end = 181
+        self.dpsi_delta = 10
 
         # For final plot axis limits
         self.vy_init = self.gs_own * np.sin(np.radians(self.hdg_own))
@@ -366,7 +366,7 @@ class ConflictResolutionSimulation:
                 # --- 1. Intruder scenario creation ---
                 x_int, y_int, hdg_int, gs_int = cre_conflict(
                     self.x_own, self.y_own, self.hdg_own, self.gs_own,
-                    dpsi_val, dcpa_val, self.tlosh, self.spd, self.rpz
+                    dpsi_val, dcpa_val, self.tlosh, self.gs_int, self.rpz
                 )
 
                 # --- 2. Create noisy positions ---
@@ -441,7 +441,7 @@ class ConflictResolutionSimulation:
                     dpsi_val,
                     self.case_title_idx,       # <-- pass along
                     self.source_of_uncertainty_idx,     # <-- pass along
-                    self.spd                        # <-- pass along
+                    self.gs_int                        # <-- pass along
                 )
                 self.results.append(cluster_results)
 
@@ -556,26 +556,12 @@ class ConflictResolutionSimulation:
                         labels[1] = "MVP Samples"
                 f.ax_joint.legend(handles=handles, labels=labels, loc='upper right')
 
-                # Debugging stats (optional)
-                if self.spd == 15 and dpsi_val == 5:
-                    print("\n--- Debugging Stats for VO ---")
-                    print("vx_mean:", round(df_vo['vx'].mean(), 2),
-                          "vx_std:", round(df_vo['vx'].std(), 2))
-                    print("vy_mean:", round(df_vo['vy'].mean(), 2),
-                          "vy_std:", round(df_vo['vy'].std(), 2))
-
-                    print("\n--- Debugging Stats for MVP ---")
-                    print("vx_mean:", round(df_mvp['vx'].mean(), 2),
-                          "vx_std:", round(df_mvp['vx'].std(), 2))
-                    print("vy_mean:", round(df_mvp['vy'].mean(), 2),
-                          "vy_std:", round(df_mvp['vy'].std(), 2))
-
                 # ---------------------------------------------------------
                 # CHANGES: Updated figure filename to include all fields
                 # ---------------------------------------------------------
                 fig_filename = (
                     f"{self.case_title_idx}_{self.source_of_uncertainty_idx}_"
-                    f"{self.spd}_{dpsi_val}_{dcpa_val}.png"
+                    f"{self.gs_int}_{dpsi_val}_{dcpa_val}.png"
                 )
                 fig_path = os.path.join(self.clustering.OUTPUT_DIR, fig_filename)
                 f.savefig(fig_path, dpi=300, bbox_inches='tight')
