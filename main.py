@@ -576,7 +576,7 @@ class ConflictResolutionSimulation:
             # You could also rename this file to include the case & source if you want
             results_csv_path = os.path.join(
                 self.clustering.OUTPUT_DIR, 
-                f"dataframe_results_{datetime}.csv"
+                f"{self.case_title_idx}_{self.source_of_uncertainty_idx}_dataframe.csv"
             )
             results_df.to_csv(results_csv_path, index=False)
             print(f"\nDataframe logging saved to: {results_csv_path}")
