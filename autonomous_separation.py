@@ -358,9 +358,12 @@ def cre_conflict(xref, yref, trkref, gsref,
     
     vrel = np.sqrt(vrelx*vrelx + vrely*vrely)
     
-    drelcpa = tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)
-    
-    dist = np.sqrt(drelcpa*drelcpa - dcpa*dcpa)
+    if(dcpa == 0):
+        drelcpa = (tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)) * 0.99
+    else:
+        drelcpa = tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)
+
+    dist = np.sqrt(drelcpa*drelcpa + dcpa*dcpa)
     
     # Rotation matrix diagonal and cross elements for distance vector
     rd      = drelcpa / dist
@@ -370,7 +373,7 @@ def cre_conflict(xref, yref, trkref, gsref,
                              rd * vrelx + rx * vrely))
     
     xint, yint = dist * np.cos(np.radians(brn)), dist * np.sin(np.radians(brn))
-    
+
     return xint, yint, trk, spd
 
 def cre_conflict_rand_dcpa(xref, yref, trkref, gsref,
