@@ -9,9 +9,6 @@ from shapely.affinity import translate
 
 # Scikit-learn imports
 from sklearn.cluster import DBSCAN
-from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.mixture import GaussianMixture
 
 from time import gmtime, strftime
 
@@ -113,7 +110,7 @@ class UncertaintyCaseSelector:
 
 class ConflictClustering:
     """
-    Handles the clustering logic (DBSCAN => GMM) for conflict data, along with
+    Handles the clustering logic (DBSCAN) for conflict data, along with
     saving CSVs and storing results. Also includes constants for:
       - OUTPUT_DIR: where data & plots get saved
       - DBSCAN hyperparameter grids
@@ -123,34 +120,6 @@ class ConflictClustering:
     # Hyperparameter grids for DBSCAN
     EPS_GRID = [0.3, 0.4, 0.5, 0.6, 0.7]
     MIN_SAMPLES_GRID = [3, 5, 7, 10]
-
-    @staticmethod
-    def find_best_dbscan_params(data, eps_values, min_samples_values):
-        """
-        Search over a grid of eps and min_samples for DBSCAN,
-        choosing the combination that yields the best silhouette score.
-        If there's only one cluster (or all outliers), silhouette is not defined => skip.
-        """
-        best_score = -1
-        best_params = (None, None)
-
-        for eps in eps_values:
-            for min_samp in min_samples_values:
-                dbscan = DBSCAN(eps=eps, min_samples=min_samp)
-                labels = dbscan.fit_predict(data)
-
-                # If there's only one cluster (or all outliers),
-                # silhouette is not defined => skip
-                unique_labels = set(labels)
-                if len(unique_labels) < 2:
-                    continue
-
-                score = silhouette_score(data, labels)
-                if score > best_score:
-                    best_score = score
-                    best_params = (eps, min_samp)
-
-        return best_params, best_score
 
     def analyze_conflicts(
         self, 
@@ -164,7 +133,7 @@ class ConflictClustering:
         """
         1) Saves the conflict-data CSV to OUTPUT_DIR using the naming pattern:
            {case_title}_{source_of_uncertainty}_{spd}_{dpsi_val}_{dcpa_val}.csv
-        2) Performs DBSCAN => GMM for both VO and MVP velocities.
+        2) Performs DBSCAN for both VO and MVP velocities.
         3) Returns a dict summarizing clustering results (e.g., # clusters, weights, means).
         """
         # Ensure the output directory exists
@@ -179,77 +148,24 @@ class ConflictClustering:
         df_conflicts.to_csv(csv_path, index=False)
 
         # Initialize cluster results
-        nb_cluster_vo, weights_vo, means_vo = 0, [], []
-        nb_cluster_mvp, weights_mvp, means_mvp = 0, [], []
+        nb_cluster_vo, weights_vo = 0, []
+        nb_cluster_mvp, weights_mvp = 0, []
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #  DBSCAN => GMM for VO data
+        #  DBSCAN
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        X_vo = df_conflicts[['vx_vo', 'vy_vo']].to_numpy()
-        if len(X_vo) > 1:
-            scaler_vo = StandardScaler()
-            X_vo_scaled = scaler_vo.fit_transform(X_vo)
+        min_samples_percentage = 0.5 # in percent
+        dbscan = DBSCAN(eps=1.5, min_samples=int(len(df_conflicts) * min_samples_percentage / 100))  # eps: neighborhood size, min_samples: points required to form a cluster
+        
+        if(len(df_conflicts) > 1):
+            df_conflicts['cluster_vo'] = dbscan.fit_predict(df_conflicts[['vx_vo', 'vy_vo']])
+            df_conflicts['cluster_mvp'] = dbscan.fit_predict(df_conflicts[['vx_mvp', 'vy_mvp']])
 
-            (best_eps_vo, best_min_vo), best_score_vo = self.find_best_dbscan_params(
-                X_vo_scaled,
-                eps_values=self.EPS_GRID,
-                min_samples_values=self.MIN_SAMPLES_GRID
-            )
+            nb_cluster_vo = len(df_conflicts['cluster_vo'].unique())
+            nb_cluster_mvp = len(df_conflicts['cluster_mvp'].unique())
 
-            # Decide on n_components for GMM from DBSCAN
-            if best_eps_vo is None:
-                # No valid silhouette => only 1 cluster formed (or 0)
-                n_components_vo = 1
-            else:
-                dbscan_vo = DBSCAN(eps=best_eps_vo, min_samples=best_min_vo)
-                vo_labels = dbscan_vo.fit_predict(X_vo_scaled)
-                unique_vo_labels = set(vo_labels)
-                if -1 in unique_vo_labels:
-                    unique_vo_labels.remove(-1)
-                n_components_vo = len(unique_vo_labels) if len(unique_vo_labels) > 0 else 1
-
-            # Fit GMM
-            gmm_vo = GaussianMixture(n_components=n_components_vo, random_state=42)
-            gmm_vo.fit(X_vo_scaled)
-
-            # Extract GMM parameters
-            nb_cluster_vo = n_components_vo
-            weights_vo = gmm_vo.weights_.tolist()
-            means_vo = gmm_vo.means_.tolist()
-
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #  DBSCAN => GMM for MVP data
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        X_mvp = df_conflicts[['vx_mvp', 'vy_mvp']].to_numpy()
-        if len(X_mvp) > 1:
-            scaler_mvp = StandardScaler()
-            X_mvp_scaled = scaler_mvp.fit_transform(X_mvp)
-
-            (best_eps_mvp, best_min_mvp), best_score_mvp = self.find_best_dbscan_params(
-                X_mvp_scaled,
-                eps_values=self.EPS_GRID,
-                min_samples_values=self.MIN_SAMPLES_GRID
-            )
-
-            # Decide on n_components for GMM from DBSCAN
-            if best_eps_mvp is None:
-                n_components_mvp = 1
-            else:
-                dbscan_mvp = DBSCAN(eps=best_eps_mvp, min_samples=best_min_mvp)
-                mvp_labels = dbscan_mvp.fit_predict(X_mvp_scaled)
-                unique_mvp_labels = set(mvp_labels)
-                if -1 in unique_mvp_labels:
-                    unique_mvp_labels.remove(-1)
-                n_components_mvp = len(unique_mvp_labels) if len(unique_mvp_labels) > 0 else 1
-
-            # Fit GMM
-            gmm_mvp = GaussianMixture(n_components=n_components_mvp, random_state=42)
-            gmm_mvp.fit(X_mvp_scaled)
-
-            # Extract GMM parameters
-            nb_cluster_mvp = n_components_mvp
-            weights_mvp = gmm_mvp.weights_.tolist()
-            means_mvp = gmm_mvp.means_.tolist()
+            weights_vo = (df_conflicts['cluster_vo'].value_counts() / df_conflicts['cluster_vo'].count()).to_list()
+            weights_mvp = (df_conflicts['cluster_mvp'].value_counts() / df_conflicts['cluster_mvp'].count()).to_list()
 
         # Return all info as a dictionary
         return {
@@ -257,10 +173,8 @@ class ConflictClustering:
             "dpsi_val": dpsi_val,
             "nb_cluster_vo": nb_cluster_vo,
             "cluster_weights_vo": weights_vo,
-            "cluster_means_vo": means_vo,
             "nb_cluster_mvp": nb_cluster_mvp,
             "cluster_weights_mvp": weights_mvp,
-            "cluster_means_mvp": means_mvp
         }
 
 
@@ -282,11 +196,11 @@ class ConflictResolutionSimulation:
         self.tlosh = 15
         self.rpz = 50
         self.dcpa_start = 0
-        self.dcpa_end = 49
+        self.dcpa_end = 2
         self.dcpa_delta = 5  # With start=0, end=4, delta=5 => only dcpa=0
         self.dpsi_start = 0
-        self.dpsi_end = 181
-        self.dpsi_delta = 10
+        self.dpsi_end = 21
+        self.dpsi_delta = 5
 
         # For final plot axis limits
         self.vy_init = self.gs_own * np.sin(np.radians(self.hdg_own))
@@ -345,9 +259,9 @@ class ConflictResolutionSimulation:
         # Heading noise
         if self.hdg_uncertainty_on:
             if self.src_ownship_on:
-                self.hdg_sigma_ownship = 5
+                self.hdg_sigma_ownship = 15
             if self.src_intruder_on:
-                self.hdg_sigma_intruder = 5
+                self.hdg_sigma_intruder = 15
 
         # Speed noise
         if self.spd_uncertainty_on:
@@ -359,7 +273,7 @@ class ConflictResolutionSimulation:
     def run_simulation(self):
         """
         Main simulation loop. Creates conflicts, generates noisy samples,
-        detects conflicts, clusters them (DBSCAN => GMM), and visualizes resolutions.
+        detects conflicts, clusters them (DBSCAN), and visualizes resolutions.
         """
         for dcpa_val in range(self.dcpa_start, self.dcpa_end, self.dcpa_delta):
             for dpsi_val in range(self.dpsi_start, self.dpsi_end, self.dpsi_delta):
@@ -397,14 +311,18 @@ class ConflictResolutionSimulation:
                     'y_own_true': self.y_own,
                     'x_own_noise': x_o,
                     'y_own_noise': y_o,
-                    'hdg_own': hdg_ownship,
-                    'gs_own': gs_ownship,
+                    'hdg_own_true': self.hdg_own,
+                    'gs_own_true': self.gs_own,
+                    'hdg_own_noise': hdg_ownship,
+                    'gs_own_noise': gs_ownship,
                     'x_int_true': x_int,
                     'y_int_true': y_int,
                     'x_int_noise': x_i,
                     'y_int_noise': y_i,
-                    'hdg_int': hdg_intruder,
-                    'gs_int': gs_intruder
+                    'hdg_int_true': hdg_int,
+                    'gs_int_true': gs_int,
+                    'hdg_int_noise': hdg_intruder,
+                    'gs_int_noise': gs_intruder
                 })
 
                 df['pos_ownship'] = [
