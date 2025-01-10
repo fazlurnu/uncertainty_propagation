@@ -454,33 +454,33 @@ def conflict_detection_hor(ownship_position, ownship_gs, ownship_heading,
         return dx, dy, tin, tout, dcpa, LOS
     
 def detect_conflict(row):
-    dx, dy, tin, tout, dcpa, is_conflict = conflict_detection_hor(row['pos_ownship'], row['gs_own'], row['hdg_own'],
-                                             row['pos_intruder'], row['gs_int'], row['hdg_int'])
+    dx, dy, tin, tout, dcpa, is_conflict = conflict_detection_hor(row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
+                                             row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'])
     return dx, dy, tin, tout, dcpa, is_conflict
 
 # Assuming conflict_detection_hor returns t1, t2, t3, t4
 # and that df already contains the DataFrame with the necessary columns
 def conf_reso_VO(row):
-    vx, vy = VO(row['pos_ownship'], row['gs_own'], row['hdg_own'],
-                row['pos_intruder'], row['gs_int'], row['hdg_int'],
+    vx, vy = VO(row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
+                row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
                 50, method = 0)
     return vx, vy
 
 def conf_reso_MVP(row):
-    dcpa, vx, vy = MVP(row['pos_ownship'], row['gs_own'], row['hdg_own'],
-                      row['pos_intruder'], row['gs_int'], row['hdg_int'],
+    dcpa, vx, vy = MVP(row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
+                      row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
                       50)
     return vx, vy
 
 def conf_reso_MVP_int(row):
-    dcpa, vx, vy = MVP(row['pos_intruder'], row['gs_int'], row['hdg_int'],
-                      row['pos_ownship'], row['gs_own'], row['hdg_own'],
+    dcpa, vx, vy = MVP(row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
+                      row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
                       50)
     return vx, vy
 
 def conf_reso_VO_int(row):
-    vx, vy = VO(row['pos_intruder'], row['gs_int'], row['hdg_int'],
-                row['pos_ownship'], row['gs_own'], row['hdg_own'],
+    vx, vy = VO(row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
+                row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
                 50)
     return vx, vy
 
