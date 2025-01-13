@@ -60,9 +60,10 @@ def choose_right_vector(current, hdg_1, hdg_2, vector_1, vector_2):
         
 def VO(ownship_position, ownship_gs, ownship_trk,
        intruder_position, intruder_gs, intruder_trk,
-       rpz, method = 0, scale = 1.0):
+       rpz, method = 0, scale = 1.0, resofach = 1.05):
     
-    rpz = rpz * 1.05
+    resofach = 1.05
+    rpz = np.max(rpz * resofach)
     ownship_trk_rad = np.radians(ownship_trk)
     intruder_trk_rad = np.radians(intruder_trk)
     
@@ -359,7 +360,7 @@ def cre_conflict(xref, yref, trkref, gsref,
     vrel = np.sqrt(vrelx*vrelx + vrely*vrely)
     
     if(dcpa == 0):
-        drelcpa = (tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)) * 0.99
+        drelcpa = (tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)) - (rpz * 1.0)
     else:
         drelcpa = tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)
 
@@ -486,7 +487,7 @@ def conf_reso_VO_int(row):
 
 def MVP(ownship_pos, ownship_gs, ownship_heading,
         intruder_pos, intruder_gs, intruder_heading,
-        rpz, tlookahead = 15):
+        rpz, tlookahead = 15, resofach = 1.05):
     """Modified Voltage Potential (MVP) resolution method"""
     # Preliminary calculations-------------------------------------------------
     # Determine largest RPZ and HPZ of the conflict pair, use lookahead of ownship
