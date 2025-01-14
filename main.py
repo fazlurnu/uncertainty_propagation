@@ -196,17 +196,17 @@ class ConflictResolutionSimulation:
         self.tlosh = 15
         self.rpz = 50
         self.dcpa_start = 0
-        self.dcpa_end = 2
+        self.dcpa_end = 1
         self.dcpa_delta = 5  # With start=0, end=4, delta=5 => only dcpa=0
         self.dpsi_start = 0
-        self.dpsi_end = 21
+        self.dpsi_end = 11
         self.dpsi_delta = 5
 
         # For final plot axis limits
         self.vy_init = self.gs_own * np.sin(np.radians(self.hdg_own))
         self.vx_init = self.gs_own * np.cos(np.radians(self.hdg_own))
 
-        self.nb_samples = 5000
+        self.nb_samples = 50000
         self.alpha_uncertainty = 0.4
 
         # Uncertainty switches (defaults to False)
@@ -266,9 +266,9 @@ class ConflictResolutionSimulation:
         # Speed noise
         if self.spd_uncertainty_on:
             if self.src_ownship_on:
-                self.gs_sigma_ownship = 5
+                self.gs_sigma_ownship = 2
             if self.src_intruder_on:
-                self.gs_sigma_intruder = 5
+                self.gs_sigma_intruder = 2
 
     def run_simulation(self):
         """
@@ -347,7 +347,8 @@ class ConflictResolutionSimulation:
                 )
 
                 # --- 6. Filter to only rows in conflict for clustering & plotting ---
-                df_conflict = df.loc[df['is_conflict']].copy()
+                # df_conflict = df.loc[df['is_conflict']].copy()
+                df_conflict = df
                 if df_conflict.empty:
                     # No conflicts => skip
                     continue
