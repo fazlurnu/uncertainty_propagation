@@ -1,3 +1,5 @@
+import sys
+
 import os
 import numpy as np
 import pandas as pd
@@ -23,89 +25,6 @@ from autonomous_separation import (
     MVP,
     get_cc_tp
 )
-
-
-class UncertaintyCaseSelector:
-    """
-    Handles user input for determining which uncertainties (position, heading, speed)
-    and which source (ownship, intruder, both) are active.
-    """
-    def __init__(self):
-        self.case_title_idx = None
-        self.source_of_uncertainty_idx = None
-
-    @staticmethod
-    def binary_to_case_title(binary_input: int) -> str:
-        """
-        Convert a decimal integer (1-7) corresponding to a three-bit binary string
-        into a descriptive string for type of uncertainty (pos, hdg, speed).
-        """
-        cases = {
-            1: "position only",        # 001
-            2: "heading only",         # 010
-            4: "speed only",           # 100
-            3: "position and heading", # 011
-            5: "position and speed",   # 101
-            6: "heading and speed",    # 110
-            7: "all"                   # 111
-        }
-        return cases.get(binary_input, "Invalid case")
-
-    @staticmethod
-    def binary_to_uncertainty_source(binary_input: int) -> str:
-        """
-        Convert a decimal integer (1-3) corresponding to a two-bit binary string
-        into a descriptive string for source of uncertainty (ownship, intruder, both).
-        """
-        sources = {
-            1: "ownship only",   # 01
-            2: "intruder only",  # 10
-            3: "both"            # 11
-        }
-        return sources.get(binary_input, "Invalid case")
-
-    def select_case_title(self):
-        """
-        Prompt user to enter a three-bit binary string to select the uncertainty type
-        (position, heading, speed) and store both the descriptive string and index.
-        """
-        print("Select case title by activating the binary")
-        print("  001 for position only")
-        print("  010 for heading only")
-        print("  100 for speed only")
-        print("  011 for position and heading")
-        print("  101 for position and speed")
-        print("  110 for heading and speed")
-        print("  111 for all")
-
-        binary_input = input("Case title here (three-digit binary): ").strip()
-        if len(binary_input) != 3 or not all(bit in "01" for bit in binary_input):
-            print("Invalid input. Please enter a three-digit binary number.")
-            return None, None
-
-        self.case_title_idx = int(binary_input, 2)
-        return (self.binary_to_case_title(self.case_title_idx), self.case_title_idx)
-
-    def select_source_of_uncertainty(self):
-        """
-        Prompt user to enter a two-bit binary string to select the source of uncertainty
-        (ownship, intruder, both) and store both the descriptive string and index.
-        """
-        print("Select the mixture of source of uncertainty by activating the binary")
-        print("  01 for ownship only")
-        print("  10 for intruder only")
-        print("  11 for both")
-
-        binary_input = input("Source of uncertainty here (two-digit binary): ").strip()
-        if len(binary_input) != 2 or not all(bit in "01" for bit in binary_input):
-            print("Invalid input. Please enter a two-digit binary number.")
-            return None, None
-
-        self.source_of_uncertainty_idx = int(binary_input, 2)
-        return (
-            self.binary_to_uncertainty_source(self.source_of_uncertainty_idx),
-            self.source_of_uncertainty_idx
-        )
 
 
 class ConflictClustering:
@@ -184,7 +103,7 @@ class ConflictResolutionSimulation:
     conflict-resolution scenarios under various uncertainties.
     """
 
-    def __init__(self):
+    def __init__(self, case_title_selected, source_of_uncertainty):
         # -- DEFAULTS / INITIAL SETUP --
         self.x_own = 0
         self.y_own = 0
@@ -195,18 +114,18 @@ class ConflictResolutionSimulation:
         self.gs_int = 15 ## this is the speed of the intruder
         self.tlosh = 15
         self.rpz = 50
-        self.dcpa_start = 0
-        self.dcpa_end = 1
+        self.dcpa_start = 20
+        self.dcpa_end = 21
         self.dcpa_delta = 5  # With start=0, end=4, delta=5 => only dcpa=0
-        self.dpsi_start = 0
-        self.dpsi_end = 11
+        self.dpsi_start = 20
+        self.dpsi_end = 21
         self.dpsi_delta = 5
 
         # For final plot axis limits
         self.vy_init = self.gs_own * np.sin(np.radians(self.hdg_own))
         self.vx_init = self.gs_own * np.cos(np.radians(self.hdg_own))
 
-        self.nb_samples = 50000
+        self.nb_samples = 10000
         self.alpha_uncertainty = 0.4
 
         # Uncertainty switches (defaults to False)
@@ -224,28 +143,26 @@ class ConflictResolutionSimulation:
         self.gs_sigma_intruder = 0
 
         # For user selections
-        self.case_title_selected = None
-        self.case_title_idx = None
-        self.source_of_uncertainty = None
-        self.source_of_uncertainty_idx = None
+        self.case_title_selected = case_title_selected
+        self.source_of_uncertainty = source_of_uncertainty
+
+        self.reso_algo = None
 
         # Clustering logic & results
         self.clustering = ConflictClustering()
         self.results = []
 
-    def set_uncertainty_switches(self, case_title_idx: int, source_of_uncertainty_idx: int):
-        """
-        Determine which uncertainties (position, heading, speed) apply,
-        and whether they apply to ownship, intruder, or both.
-        """
-        # 3-bit input for position / heading / speed
-        self.pos_uncertainty_on = bool(case_title_idx & 0b001)  # position bit
-        self.hdg_uncertainty_on = bool(case_title_idx & 0b010)  # heading bit
-        self.spd_uncertainty_on = bool(case_title_idx & 0b100)  # speed bit
+        if('s' in self.case_title_selected):
+            self.spd_uncertainty_on = True
+        if('h' in self.case_title_selected):
+            self.hdg_uncertainty_on = True
+        if('p' in self.case_title_selected):
+            self.pos_uncertainty_on = True
 
-        # 2-bit input for ownship / intruder
-        self.src_ownship_on = bool(source_of_uncertainty_idx & 0b01)
-        self.src_intruder_on = bool(source_of_uncertainty_idx & 0b10)
+        if('o' in self.source_of_uncertainty):
+            self.src_ownship_on = True
+        if('i' in self.source_of_uncertainty):
+            self.src_intruder_on = True
 
     def set_noise_parameters(self):
         """
@@ -259,9 +176,9 @@ class ConflictResolutionSimulation:
         # Heading noise
         if self.hdg_uncertainty_on:
             if self.src_ownship_on:
-                self.hdg_sigma_ownship = 15
+                self.hdg_sigma_ownship = 3
             if self.src_intruder_on:
-                self.hdg_sigma_intruder = 15
+                self.hdg_sigma_intruder = 3
 
         # Speed noise
         if self.spd_uncertainty_on:
@@ -358,9 +275,9 @@ class ConflictResolutionSimulation:
                     df_conflict,
                     dcpa_val,
                     dpsi_val,
-                    self.case_title_idx,       # <-- pass along
-                    self.source_of_uncertainty_idx,     # <-- pass along
-                    self.gs_int                        # <-- pass along
+                    self.case_title_selected,       # <-- pass along
+                    self.source_of_uncertainty,     # <-- pass along
+                    self.gs_int                     # <-- pass along
                 )
                 self.results.append(cluster_results)
 
@@ -368,12 +285,12 @@ class ConflictResolutionSimulation:
                 #  8. PLOTTING
                 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 # Prepare data for plotting (only rows in conflict).
-                df_vo = df_conflict[['vx_vo', 'vy_vo']].copy()
+                df_vo = df_conflict[df_conflict['is_conflict']][['vx_vo', 'vy_vo']].copy()
                 df_vo['vx'] = df_conflict['vx_vo']
                 df_vo['vy'] = df_conflict['vy_vo']
                 df_vo['Conf Reso'] = 'VO'
 
-                df_mvp = df_conflict[['vx_mvp', 'vy_mvp']].copy()
+                df_mvp = df_conflict[df_conflict['is_conflict']][['vx_mvp', 'vy_mvp']].copy()
                 df_mvp['vx'] = df_conflict['vx_mvp']
                 df_mvp['vy'] = df_conflict['vy_mvp']
                 df_mvp['Conf Reso'] = 'MVP'
@@ -479,7 +396,7 @@ class ConflictResolutionSimulation:
                 # CHANGES: Updated figure filename to include all fields
                 # ---------------------------------------------------------
                 fig_filename = (
-                    f"{self.case_title_idx}_{self.source_of_uncertainty_idx}_"
+                    f"{self.case_title_selected}_{self.source_of_uncertainty}_"
                     f"{self.gs_int}_{dpsi_val}_{dcpa_val}.png"
                 )
                 fig_path = os.path.join(self.clustering.OUTPUT_DIR, fig_filename)
@@ -491,11 +408,11 @@ class ConflictResolutionSimulation:
         # ------------------------------------------------------------
         if self.results:
             results_df = pd.DataFrame(self.results)
-            datetime = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+            datetime = strftime("%Y_%m_%d_%H_%M_%S", gmtime())
             # You could also rename this file to include the case & source if you want
             results_csv_path = os.path.join(
                 self.clustering.OUTPUT_DIR, 
-                f"{self.case_title_idx}_{self.source_of_uncertainty_idx}_dataframe.csv"
+                f"{self.case_title_selected}_{self.source_of_uncertainty}_dataframe_{datetime}.csv"
             )
             results_df.to_csv(results_csv_path, index=False)
             print(f"\nDataframe logging saved to: {results_csv_path}")
@@ -511,29 +428,38 @@ def main():
       3. Running the main simulation loop (clustering + plotting + CSV logging).
     """
     # 1. Create a selector for user input
-    selector = UncertaintyCaseSelector()
 
-    # 2. Prompt user for the uncertainty type (pos, hdg, spd)
-    case_title_selected, case_title_idx = selector.select_case_title()
-    if case_title_idx is None:
-        print("No valid case title selected. Exiting.")
-        return
+    print(len(sys.argv))
+    if len(sys.argv) != 3:
+        print("Usage: python main.py <nav_uncertainty> <vehicle_uncertainty>")
+        print("  - nav_uncertainty: combination of s (speed), h (heading), p (position)")
+        print("  - vehicle_uncertainty: combination 'o' (ownship) and 'i' (intruder)")
+        
+        print("Settings is set to default: shp oi")
 
-    # 3. Prompt user for the source of uncertainty (ownship, intruder, both)
-    source_of_uncertainty, source_of_uncertainty_idx = selector.select_source_of_uncertainty()
-    if source_of_uncertainty_idx is None:
-        print("No valid source of uncertainty selected. Exiting.")
-        return
+        nav_uncertainty = 'shp'
+        vehicle_uncertainty = 'oi'
+    else:
+        nav_uncertainty = sys.argv[1].lower().strip()  # e.g. "sh", "p", "s", "shp"
+        vehicle_uncertainty = sys.argv[2].lower().strip()    # e.g. "o" or "i"
+
+        print(f"Settings is set to: {nav_uncertainty} {vehicle_uncertainty}")
+
+    # Validate nav_uncertainty letters
+    allowed_uncertainty_letters = {'s', 'h', 'p'}
+    if any(char not in allowed_uncertainty_letters for char in nav_uncertainty):
+        raise ValueError("nav_uncertainty can only contain 's', 'h', 'p'")
+
+    # Validate vehicle_uncertainty letters
+    allowed_vehicle_letters = {'o', 'i'}
+    if any(char not in allowed_vehicle_letters for char in vehicle_uncertainty):
+        raise ValueError("vehicle_uncertainty can only be 'o' or 'i'")
+
+    print(f"Selected source of uncertainty: {nav_uncertainty}")
+    print(f"Selected vehicle uncertainty: {vehicle_uncertainty}")
 
     # 4. Initialize the conflict-resolution simulation
-    sim = ConflictResolutionSimulation()
-    sim.case_title_selected = case_title_selected
-    sim.case_title_idx = case_title_idx
-    sim.source_of_uncertainty = source_of_uncertainty
-    sim.source_of_uncertainty_idx = source_of_uncertainty_idx
-
-    # 5. Set the uncertainty switches
-    sim.set_uncertainty_switches(case_title_idx, source_of_uncertainty_idx)
+    sim = ConflictResolutionSimulation(nav_uncertainty, vehicle_uncertainty)
 
     # 6. Print chosen switches for clarity
     print(f"\nSelected case title: {sim.case_title_selected}")
