@@ -111,11 +111,11 @@ class ConflictResolutionSimulation:
         self.gs_own = 20
 
         # Loop parameters
-        self.gs_int = 15 ## this is the speed of the intruder
+        self.gs_int = 20 ## this is the speed of the intruder
         self.tlosh = 15
         self.rpz = 50
-        self.dcpa_start = 20
-        self.dcpa_end = 21
+        self.dcpa_start = 0
+        self.dcpa_end = 11
         self.dcpa_delta = 5  # With start=0, end=4, delta=5 => only dcpa=0
         self.dpsi_start = 20
         self.dpsi_end = 21
@@ -176,16 +176,16 @@ class ConflictResolutionSimulation:
         # Heading noise
         if self.hdg_uncertainty_on:
             if self.src_ownship_on:
-                self.hdg_sigma_ownship = 3
+                self.hdg_sigma_ownship = 10
             if self.src_intruder_on:
-                self.hdg_sigma_intruder = 3
+                self.hdg_sigma_intruder = 10
 
         # Speed noise
         if self.spd_uncertainty_on:
             if self.src_ownship_on:
-                self.gs_sigma_ownship = 2
+                self.gs_sigma_ownship = 10
             if self.src_intruder_on:
-                self.gs_sigma_intruder = 2
+                self.gs_sigma_intruder = 10
 
     def run_simulation(self):
         """
@@ -317,6 +317,10 @@ class ConflictResolutionSimulation:
                                        Point(x_int, y_int), self.rpz)
                 int_vel = Point(gs_int * np.cos(np.radians(hdg_int)),
                                 gs_int * np.sin(np.radians(hdg_int)))
+                
+                own_vel = Point((self.gs_own) * np.cos(np.radians(self.hdg_own)),
+                                 (self.gs_own) * np.sin(np.radians(self.hdg_own)))
+                
                 ownship_pos = Point(self.x_own, self.y_own)
 
                 if tp_1 is not None and tp_2 is not None:
@@ -369,18 +373,18 @@ class ConflictResolutionSimulation:
                 f.ax_joint.legend(handles=handles, labels=labels, loc='upper right', bbox_to_anchor=(1.25, 1.2))
 
                 # Mark lines/points for VO
-                f.ax_joint.axhline(vx_true_vo, color='tab:blue', linestyle='--',
-                                   linewidth=1.5, alpha=0.7)
-                f.ax_joint.axvline(vy_true_vo, color='tab:blue', linestyle='--',
-                                   linewidth=1.5, alpha=0.7)
+                # f.ax_joint.axhline(vx_true_vo, color='tab:blue', linestyle='--',
+                #                    linewidth=1.5, alpha=0.7)
+                # f.ax_joint.axvline(vy_true_vo, color='tab:blue', linestyle='--',
+                #                    linewidth=1.5, alpha=0.7)
                 f.ax_joint.scatter(vy_true_vo, vx_true_vo, s=100, color='blue',
                                    marker='*', zorder=10, label='True VO')
 
                 # Mark lines/points for MVP
-                f.ax_joint.axhline(vx_true_mvp, color='tab:orange', linestyle='--',
-                                   linewidth=1.5, alpha=0.7)
-                f.ax_joint.axvline(vy_true_mvp, color='tab:orange', linestyle='--',
-                                   linewidth=1.5, alpha=0.7)
+                # f.ax_joint.axhline(vx_true_mvp, color='tab:orange', linestyle='--',
+                #                    linewidth=1.5, alpha=0.7)
+                # f.ax_joint.axvline(vy_true_mvp, color='tab:orange', linestyle='--',
+                #                    linewidth=1.5, alpha=0.7)
                 f.ax_joint.scatter(vy_true_mvp, vx_true_mvp, s=100, color='orange',
                                    marker='*', zorder=10, label='True MVP')
 
@@ -392,6 +396,24 @@ class ConflictResolutionSimulation:
                         labels[1] = "MVP Samples"
                 f.ax_joint.legend(handles=handles, labels=labels, loc='upper right')
 
+                # draw relative velocity
+                # rel_vel = Point(int_vel.x - own_vel.x, int_vel.y - own_vel.y)
+
+                # plt.plot([ownship_pos.x, ownship_pos.x-rel_vel.x], [ownship_pos.y, ownship_pos.y-rel_vel.y], color = 'g', label = 'Rel Velo')
+                # plt.plot([ownship_pos.y, ownship_pos.y+y_int], [ownship_pos.x, ownship_pos.x+x_int], linestyle = '--', color = 'r')
+                # plt.plot([ownship_pos.y, ownship_pos.y+int_vel.y], [ownship_pos.x, ownship_pos.x+int_vel.x], color = 'r')
+                # plt.plot([ownship_pos.y, ownship_pos.y-rel_vel.y*100], [ownship_pos.x, ownship_pos.x-rel_vel.x*100], color = 'g', linestyle = '--', alpha = 0.5)
+
+                dcpa, _, _ = MVP(Point(self.x_own, self.y_own), self.gs_own, self.hdg_own,
+                                   Point(x_int, y_int), gs_int, hdg_int, self.rpz)
+                
+                if(np.sqrt(dcpa[0]**2 + dcpa[1]**2) < 1):
+                    dcpa = dcpa * (1/np.sqrt(dcpa[0]**2 + dcpa[1]**2))
+
+                plt.plot([own_vel.y, own_vel.y + dcpa[0] * 100], [own_vel.x, own_vel.x + dcpa[1] * 100], '--r', zorder = 1)
+                plt.plot([own_vel.y, own_vel.y - dcpa[0] * 100], [own_vel.x, own_vel.x - dcpa[1] * 100], '--r', zorder = 1)
+                # plt.plot([y_int, y_int+dcpa[0]], [x_int, x_int+dcpa[1]], color = 'k')
+                
                 # ---------------------------------------------------------
                 # CHANGES: Updated figure filename to include all fields
                 # ---------------------------------------------------------
@@ -429,7 +451,6 @@ def main():
     """
     # 1. Create a selector for user input
 
-    print(len(sys.argv))
     if len(sys.argv) != 3:
         print("Usage: python main.py <nav_uncertainty> <vehicle_uncertainty>")
         print("  - nav_uncertainty: combination of s (speed), h (heading), p (position)")
@@ -454,9 +475,6 @@ def main():
     allowed_vehicle_letters = {'o', 'i'}
     if any(char not in allowed_vehicle_letters for char in vehicle_uncertainty):
         raise ValueError("vehicle_uncertainty can only be 'o' or 'i'")
-
-    print(f"Selected source of uncertainty: {nav_uncertainty}")
-    print(f"Selected vehicle uncertainty: {vehicle_uncertainty}")
 
     # 4. Initialize the conflict-resolution simulation
     sim = ConflictResolutionSimulation(nav_uncertainty, vehicle_uncertainty)
