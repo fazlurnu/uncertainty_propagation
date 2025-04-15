@@ -111,14 +111,14 @@ class ConflictResolutionSimulation:
         self.gs_own = 20
 
         # Loop parameters
-        self.gs_int = 20 ## this is the speed of the intruder
+        self.gs_int = 15 ## this is the speed of the intruder
         self.tlosh = 15
-        self.rpz = 50
+        self.rpz = 100
         self.dcpa_start = 0
-        self.dcpa_end = 11
-        self.dcpa_delta = 5  # With start=0, end=4, delta=5 => only dcpa=0
+        self.dcpa_end = 21
+        self.dcpa_delta = 10  # With start=0, end=4, delta=5 => only dcpa=0
         self.dpsi_start = 20
-        self.dpsi_end = 21
+        self.dpsi_end = 22
         self.dpsi_delta = 5
 
         # For final plot axis limits
@@ -255,11 +255,11 @@ class ConflictResolutionSimulation:
                     axis=1
                 )
                 df[['vx_vo', 'vy_vo']] = df.apply(
-                    lambda row: pd.Series(conf_reso_VO(row)),
+                    lambda row: pd.Series(conf_reso_VO(row, rpz = self.rpz, tlookahead = self.tlosh)),
                     axis=1
                 )
                 df[['vx_mvp', 'vy_mvp']] = df.apply(
-                    lambda row: pd.Series(conf_reso_MVP(row)),
+                    lambda row: pd.Series(conf_reso_MVP(row, rpz = self.rpz, tlookahead = self.tlosh)),
                     axis=1
                 )
 
@@ -361,12 +361,13 @@ class ConflictResolutionSimulation:
                 vx_true_vo, vy_true_vo = VO(
                     Point(self.x_own, self.y_own), self.gs_own, self.hdg_own,
                     Point(x_int, y_int), gs_int, hdg_int,
-                    self.rpz, method=0
+                    rpz = self.rpz, tlookahead=self.tlosh,
+                    method=0,
                 )
                 _, vx_true_mvp, vy_true_mvp = MVP(
                     Point(self.x_own, self.y_own), self.gs_own, self.hdg_own,
                     Point(x_int, y_int), gs_int, hdg_int,
-                    self.rpz
+                    rpz = self.rpz, tlookahead=self.tlosh,
                 )
 
                 handles, labels = f.ax_joint.get_legend_handles_labels()

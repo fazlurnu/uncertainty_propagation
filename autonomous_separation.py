@@ -60,7 +60,7 @@ def choose_right_vector(current, hdg_1, hdg_2, vector_1, vector_2):
         
 def VO(ownship_position, ownship_gs, ownship_trk,
        intruder_position, intruder_gs, intruder_trk,
-       rpz, method = 0, scale = 1.0, resofach = 1.05):
+       rpz, tlookahead, method = 0, scale = 1.0, resofach = 1.05):
     
     resofach = 1.05
     rpz = np.max(rpz * resofach)
@@ -360,7 +360,7 @@ def cre_conflict(xref, yref, trkref, gsref,
     vrel = np.sqrt(vrelx*vrelx + vrely*vrely)
     
     if(dcpa == 0):
-        drelcpa = (tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)) - (rpz * 1.0)
+        drelcpa = (tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)) - (rpz * 0.01)
     else:
         drelcpa = tlosh*vrel + np.sqrt(rpz*rpz - dcpa*dcpa)
 
@@ -461,28 +461,28 @@ def detect_conflict(row):
 
 # Assuming conflict_detection_hor returns t1, t2, t3, t4
 # and that df already contains the DataFrame with the necessary columns
-def conf_reso_VO(row):
+def conf_reso_VO(row, rpz, tlookahead):
     vx, vy = VO(row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
                 row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
-                50, method = 0)
+                rpz = rpz, tlookahead=tlookahead)
     return vx, vy
 
-def conf_reso_MVP(row):
+def conf_reso_MVP(row, rpz, tlookahead):
     dcpa, vx, vy = MVP(row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
                       row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
-                      50)
+                      rpz = rpz, tlookahead=tlookahead)
     return vx, vy
 
-def conf_reso_MVP_int(row):
+def conf_reso_MVP_int(row, rpz, tlookahead):
     dcpa, vx, vy = MVP(row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
                       row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
-                      50)
+                      rpz = rpz, tlookahead=tlookahead)
     return vx, vy
 
-def conf_reso_VO_int(row):
+def conf_reso_VO_int(row, rpz, tlookahead):
     vx, vy = VO(row['pos_intruder'], row['gs_int_noise'], row['hdg_int_noise'],
                 row['pos_ownship'], row['gs_own_noise'], row['hdg_own_noise'],
-                50)
+                rpz = rpz, tlookahead=tlookahead)
     return vx, vy
 
 def MVP(ownship_pos, ownship_gs, ownship_heading,
